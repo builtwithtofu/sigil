@@ -307,3 +307,11 @@ func (s *testTransportSession) Close() error {
 	// Don't close parent - we don't own it
 	return nil
 }
+
+func (s *testTransportSession) OpenFileOutput(ctx context.Context, path string, mode FileWriteMode, perm fs.FileMode) (Output, error) {
+	return OpenFileOutput(ctx, s.parent, path, mode, perm)
+}
+
+func (m *MonitoredSession) OpenFileOutput(ctx context.Context, path string, mode FileWriteMode, perm fs.FileMode) (Output, error) {
+	return OpenFileOutput(ctx, m.wrapped, path, mode, perm)
+}

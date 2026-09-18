@@ -100,7 +100,7 @@ func TestParallelBranchWorkdirIsolation(t *testing.T) {
 					},
 				},
 			},
-			Target: planfmt.CommandNode{Decorator: "@shell", Args: []planfmt.Arg{{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: outPath}}}},
+			Target: fileEndpoint(outPath),
 			Mode:   planfmt.RedirectOverwrite,
 		},
 	}}}

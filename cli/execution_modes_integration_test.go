@@ -539,10 +539,11 @@ fun deploy(token String = "super-secret-token") {
 		output := runOpal(t, opalBin, "-f", scriptFile, "deploy", "--dry-run", "--no-color")
 
 		lines := strings.Split(strings.TrimSuffix(output, "\n"), "\n")
-		require.Len(t, lines, 3)
+		require.Len(t, lines, 4)
 		assert.Equal(t, "deploy:", lines[0])
 		assert.Regexp(t, `^└─ helper\(token=sigil:[A-Za-z0-9_-]+\)$`, lines[1])
 		assert.Equal(t, `   └─ @shell echo "done"`, lines[2])
+		assert.Contains(t, lines[3], "@local(cwd=")
 		assert.NotContains(t, output, "super-secret-token", "Dry-run output must scrub raw secrets")
 		assert.NotContains(t, output, "call helper", "Display should render signature only, no 'call' prefix")
 	})

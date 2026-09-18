@@ -29,6 +29,7 @@ func Format(plan *planfmt.Plan) string {
 	for i, step := range plan.Steps {
 		fmt.Fprintf(&b, "step %d: %s\n", i+1, FormatStep(&step))
 	}
+	formatOutputReview(&b, plan)
 
 	return b.String()
 }
@@ -65,7 +66,7 @@ func formatExecutionNode(node planfmt.ExecutionNode) string {
 		if n.Mode == planfmt.RedirectAppend {
 			op = ">>"
 		}
-		return fmt.Sprintf("%s %s %s", formatExecutionNode(n.Source), op, formatCommandNode(&n.Target))
+		return fmt.Sprintf("%s %s %s", formatExecutionNode(n.Source), op, formatEndpoint(n.Target))
 	case *planfmt.LogicNode:
 		return formatLogicNode(n)
 	case *planfmt.TryNode:

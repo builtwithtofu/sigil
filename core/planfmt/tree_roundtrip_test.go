@@ -184,7 +184,7 @@ func TestTreeRoundTrip(t *testing.T) {
 									{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "echo hello"}},
 								},
 							},
-							Target: planfmt.CommandNode{
+							Target: planfmt.EndpointSpec{
 								Decorator: "@shell",
 								Args: []planfmt.Arg{
 									{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "output.txt"}},
@@ -389,7 +389,7 @@ func TestTreeRoundTrip_PreservesTransportIDs(t *testing.T) {
 									{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "cat"}},
 								},
 							},
-							Target: planfmt.CommandNode{
+							Target: planfmt.EndpointSpec{
 								Decorator:   "@shell",
 								TransportID: "transport:sink",
 								Args: []planfmt.Arg{

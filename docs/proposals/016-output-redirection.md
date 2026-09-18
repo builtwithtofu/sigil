@@ -9,6 +9,8 @@ updated: 2025-01-23
 
 # OEP-016: Output Redirection and Sink Architecture
 
+> Historical proposal, not the current contract. See [file endpoint semantics](../SPECIFICATION.md#85-file-endpoints-and-publication): output streams by default, and atomic replacement is explicit. The S3/HTTP providers and broader capabilities below are not implemented by this work.
+
 ## Summary
 
 Add POSIX-style output redirection (`>` and `>>`) to Opal with a sink architecture that enables redirecting command output to files, S3 objects, HTTP endpoints, and other destinations. The sink abstraction ensures atomic writes, capability checking, and transport-aware execution (local/SSH/Docker).

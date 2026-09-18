@@ -2,9 +2,11 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/builtwithtofu/sigil/core/decorator"
@@ -50,6 +52,7 @@ type ExecutionResult struct {
 	StepsRun    int                 // Number of steps executed
 	Telemetry   *ExecutionTelemetry // Additional metrics (nil if TelemetryOff)
 	DebugEvents []DebugEvent        // Debug events (nil if DebugOff)
+	Errors      []error             // Structured sink failures; producer status remains in ExitCode.
 }
 
 // ExecutionTelemetry holds additional execution metrics (optional, production-safe)
@@ -83,9 +86,12 @@ type executor struct {
 	workers  *shellWorkerPool
 
 	// Execution state
-	stepsRun int
-	exitCode int
-	stderr   io.Writer
+	stepsRun   int
+	exitCode   int
+	stderr     io.Writer
+	sinkMu     sync.Mutex
+	sinkErrors []error
+	stop       context.CancelCauseFunc
 
 	// Observability
 	debugEvents []DebugEvent
@@ -100,6 +106,8 @@ type executor struct {
 func ExecutePlan(ctx context.Context, plan *planfmt.Plan, config Config, vlt DisplayIDResolver) (*ExecutionResult, error) {
 	invariant.NotNil(ctx, "ctx")
 	invariant.NotNil(plan, "plan")
+	ctx, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
 
 	e := &executor{
 		config:    config,
@@ -108,6 +116,7 @@ func ExecutePlan(ctx context.Context, plan *planfmt.Plan, config Config, vlt Dis
 		workers:   nil,
 		stderr:    config.Stderr,
 		startTime: time.Now(),
+		stop:      stop,
 	}
 	if e.stderr == nil {
 		e.stderr = os.Stderr
@@ -157,6 +166,9 @@ func ExecutePlan(ctx context.Context, plan *planfmt.Plan, config Config, vlt Dis
 
 		if exitCode != 0 {
 			e.exitCode = exitCode
+			if errors.Is(context.Cause(ctx), decorator.ErrPublicationUnknown) {
+				e.exitCode = decorator.ExitFailure
+			}
 			if e.telemetry != nil {
 				stepID := step.ID
 				e.telemetry.FailedStep = &stepID
@@ -180,12 +192,16 @@ func ExecutePlan(ctx context.Context, plan *planfmt.Plan, config Config, vlt Dis
 	invariant.Postcondition(e.stepsRun >= 0, "steps run must be non-negative")
 	invariant.Postcondition(e.stepsRun <= len(plan.Steps), "steps run cannot exceed total steps")
 
+	if errors.Is(context.Cause(ctx), decorator.ErrPublicationUnknown) {
+		e.exitCode = decorator.ExitFailure
+	}
 	return &ExecutionResult{
 		ExitCode:    e.exitCode,
 		Duration:    duration,
 		StepsRun:    e.stepsRun,
 		Telemetry:   e.telemetry,
 		DebugEvents: e.debugEvents,
+		Errors:      e.sinkErrors,
 	}, nil
 }
 

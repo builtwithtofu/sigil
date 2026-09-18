@@ -488,8 +488,8 @@ func TestLocalTransportExec_EmptyEnv(t *testing.T) {
 	assert.NotEmpty(t, stdout.String())
 }
 
-// TestLocalTransportOpenFileWriter_AtomicOverwrite tests atomic writes for overwrite mode
-func TestLocalTransportOpenFileWriter_AtomicOverwrite(t *testing.T) {
+// SDK callers and plan endpoints share streaming overwrite semantics.
+func TestLocalTransportOpenFileWriter_StreamingOverwrite(t *testing.T) {
 	transport := &LocalTransport{}
 	defer transport.Close()
 
@@ -510,13 +510,12 @@ func TestLocalTransportOpenFileWriter_AtomicOverwrite(t *testing.T) {
 	_, err = writer.Write([]byte(newContent))
 	require.NoError(t, err)
 
-	// Before Close(), the original file should still exist with old content
-	// (atomic write uses temp file)
+	// Written bytes are visible before completion.
 	data, err := os.ReadFile(targetPath)
 	require.NoError(t, err)
-	assert.Equal(t, initialContent, string(data), "Original file should be unchanged before Close()")
+	assert.Equal(t, newContent, string(data), "output must stream before Close")
 
-	// Close should rename temp file to target (atomic)
+	// Completion closes the stream; it does not publish a replacement.
 	err = writer.Close()
 	require.NoError(t, err)
 
@@ -525,12 +524,9 @@ func TestLocalTransportOpenFileWriter_AtomicOverwrite(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, newContent, string(data), "File should have new content after Close()")
 
-	// Verify no temp files left behind
 	entries, err := os.ReadDir(tmpDir)
 	require.NoError(t, err)
-	for _, entry := range entries {
-		assert.NotContains(t, entry.Name(), ".opal.tmp", "No temp files should remain")
-	}
+	require.Len(t, entries, 1)
 }
 
 // TestLocalTransportOpenFileWriter_Append tests append mode

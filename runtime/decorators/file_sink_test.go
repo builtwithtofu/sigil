@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -77,6 +78,10 @@ func (s *sessionCallTracker) Close() error {
 	return s.delegate.Close()
 }
 
+func (s *sessionCallTracker) OpenFileOutput(ctx context.Context, path string, mode decorator.FileWriteMode, perm fs.FileMode) (decorator.Output, error) {
+	return decorator.OpenFileOutput(ctx, s.delegate, path, mode, perm)
+}
+
 func (s *sessionCallTracker) snapshot() (puts, gets []string, runs [][]string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -98,7 +103,7 @@ func TestFileSinkDecorator_DescriptorAndCaps(t *testing.T) {
 	}
 
 	gotCaps := sink.IOCaps()
-	wantCaps := decorator.IOCaps{Read: true, Write: true, Append: true, Atomic: true}
+	wantCaps := decorator.IOCaps{Read: true, Write: true, Append: true}
 	if diff := cmp.Diff(wantCaps, gotCaps); diff != "" {
 		t.Fatalf("iocaps mismatch (-want +got):\n%s", diff)
 	}
@@ -106,6 +111,9 @@ func TestFileSinkDecorator_DescriptorAndCaps(t *testing.T) {
 
 func TestFileSinkDecorator_OverwriteWrite(t *testing.T) {
 	tempDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(tempDir, "out"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	delegate := decorator.NewLocalSession().WithWorkdir(tempDir)
 	tracker := &sessionCallTracker{delegate: delegate, sessionID: "local-tracker"}
 
@@ -124,7 +132,7 @@ func TestFileSinkDecorator_OverwriteWrite(t *testing.T) {
 	if n != 6 {
 		t.Fatalf("expected write 6 bytes, wrote %d", n)
 	}
-	if err := writer.Close(); err != nil {
+	if err := writer.Finish(context.Background()); err != nil {
 		t.Fatalf("close write: %v", err)
 	}
 
@@ -137,15 +145,12 @@ func TestFileSinkDecorator_OverwriteWrite(t *testing.T) {
 		t.Fatalf("overwrite content mismatch (-want +got):\n%s", diff)
 	}
 
-	puts, gets, runs := tracker.snapshot()
+	puts, gets, _ := tracker.snapshot()
 	if len(puts) != 0 {
 		t.Fatalf("expected no direct put calls for streaming writer, got %d", len(puts))
 	}
 	if len(gets) != 0 {
 		t.Fatalf("expected no read call for overwrite, got %d", len(gets))
-	}
-	if len(runs) == 0 {
-		t.Fatal("expected at least one session run call for streaming write")
 	}
 }
 
@@ -169,7 +174,7 @@ func TestFileSinkDecorator_AppendWrite(t *testing.T) {
 	if _, err := writer.Write([]byte("two\n")); err != nil {
 		t.Fatalf("write append: %v", err)
 	}
-	if err := writer.Close(); err != nil {
+	if err := writer.Finish(context.Background()); err != nil {
 		t.Fatalf("close append: %v", err)
 	}
 
@@ -181,15 +186,12 @@ func TestFileSinkDecorator_AppendWrite(t *testing.T) {
 		t.Fatalf("append content mismatch (-want +got):\n%s", diff)
 	}
 
-	puts, gets, runs := tracker.snapshot()
+	puts, gets, _ := tracker.snapshot()
 	if len(puts) != 0 {
 		t.Fatalf("expected no direct put calls for append streaming writer, got %d", len(puts))
 	}
 	if len(gets) != 0 {
 		t.Fatalf("expected no direct get calls for append streaming writer, got %d", len(gets))
-	}
-	if len(runs) == 0 {
-		t.Fatal("expected at least one session run call for append streaming write")
 	}
 }
 
@@ -247,6 +249,9 @@ func TestFileSinkDecorator_MissingPath(t *testing.T) {
 
 func TestFileSinkDecorator_PermInt64(t *testing.T) {
 	tempDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(tempDir, "out"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	delegate := decorator.NewLocalSession().WithWorkdir(tempDir)
 
 	sink := &FileSinkDecorator{params: map[string]any{"path": "out/perm-int64.txt", "perm": int64(0o640)}}
@@ -259,7 +264,7 @@ func TestFileSinkDecorator_PermInt64(t *testing.T) {
 	if _, err := writer.Write([]byte("perm\n")); err != nil {
 		t.Fatalf("write with int64 perm: %v", err)
 	}
-	if err := writer.Close(); err != nil {
+	if err := writer.Finish(context.Background()); err != nil {
 		t.Fatalf("close write with int64 perm: %v", err)
 	}
 

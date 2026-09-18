@@ -117,7 +117,7 @@ func (p *Plan) Canonicalize() (*CanonicalPlan, error) {
 	p.sortTransports()
 
 	cp := &CanonicalPlan{
-		Version:    1,        // Canonical format version
+		Version:    2,        // Endpoint execution semantics version.
 		Target:     p.Target, // Include target to distinguish deploy vs destroy
 		Steps:      make([]CanonicalStep, len(p.Steps)),
 		Transports: make([]CanonicalTransport, len(p.Transports)),
@@ -365,7 +365,7 @@ func canonicalizeRedirectNode(n *RedirectNode) (CanonicalNode, error) {
 		return CanonicalNode{}, fmt.Errorf("source: %w", err)
 	}
 
-	target, err := canonicalizeCommandNode(&n.Target)
+	target, err := canonicalizeCommandNode(n.Target.Command())
 	if err != nil {
 		return CanonicalNode{}, fmt.Errorf("target: %w", err)
 	}

@@ -94,6 +94,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/builtwithtofu/sigil/core/decorator"
 	"github.com/builtwithtofu/sigil/core/sdk/executor"
 )
 
@@ -197,29 +198,8 @@ const (
 	RedirectInput     = executor.RedirectInput
 )
 
-// SinkCaps describes what operations a sink supports.
-//
-// Capability Semantics:
-//   - Overwrite: Sink supports truncating writes (>). When false, > operations fail.
-//   - Append: Sink supports appending to existing content (>>). When false, >> operations fail.
-//   - Read: Sink supports reading for input redirection (<). When false, < operations fail.
-//   - Atomic: Sink guarantees atomic writes (readers see old-or-new, never partial).
-//     Implementations typically use temp file + rename. Ignored for append mode.
-//   - ConcurrentSafe: Multiple writers can write concurrently without corruption.
-//     Most file sinks set this false (OS doesn't guarantee linearizable appends).
-//   - Streaming: Sink can accept incremental writes without buffering entire output.
-//     Cloud sinks (S3, HTTP) may require buffering and set this false.
-//   - EarlyOpen: Sink can be opened before command starts for early failure detection.
-//     Setting this true enables pre-flight validation of permissions/resources.
-type SinkCaps struct {
-	Overwrite      bool // Supports > (truncate and write)
-	Append         bool // Supports >> (append to existing)
-	Read           bool // Supports < (read from source)
-	Atomic         bool // Writes are atomic (readers see old-or-new, never partial)
-	ConcurrentSafe bool // Multiple writers can safely write concurrently
-	Streaming      bool // Supports streaming output (no buffering)
-	EarlyOpen      bool // Can open before command starts (for pipeline optimization)
-}
+// SinkCaps uses the same operation vocabulary as registered endpoints.
+type SinkCaps = decorator.IOCaps
 
 // SinkStream specifies which output stream to redirect.
 type SinkStream int
@@ -252,7 +232,7 @@ func (e *SinkCapabilityError) Error() string {
 // Returns a SinkCapabilityError if the sink lacks the required capability.
 //
 // Modes:
-//   - RedirectOverwrite: requires Caps().Overwrite == true
+//   - RedirectOverwrite: requires Caps().Write == true
 //   - RedirectAppend: requires Caps().Append == true
 func ValidateSinkForWrite(sink Sink, mode RedirectMode) error {
 	caps := sink.Caps()
@@ -260,12 +240,12 @@ func ValidateSinkForWrite(sink Sink, mode RedirectMode) error {
 
 	switch mode {
 	case RedirectOverwrite:
-		if !caps.Overwrite {
+		if !caps.Write {
 			return &SinkCapabilityError{
 				SinkKind:    kind,
 				SinkID:      id,
 				RequestedOp: "overwrite (>)",
-				MissingCaps: []string{"Overwrite"},
+				MissingCaps: []string{"Write"},
 			}
 		}
 	case RedirectAppend:
@@ -321,16 +301,16 @@ type SinkOpts struct {
 // Sinks are opened using the current execution context's transport,
 // so files open in the right place (local/SSH/Docker/etc).
 //
-// Examples:
-//   - FsPathSink: File on local or remote filesystem
-//   - S3Sink: S3 object (future)
-//   - HTTPSink: HTTP endpoint (future)
+// Deprecated: Register decorator.Sink implementations for new endpoints.
+// This interface is retained for SDK execution trees and adapted to Output.
 type Sink interface {
 	// Caps returns what operations this sink supports.
 	Caps() SinkCaps
 
 	// OpenWrite opens the sink for writing using the current context's transport.
 	// The returned WriteCloser MUST be closed by the caller.
+	// Open must acquire the destination before returning. Close only releases the
+	// streaming writer; publish-on-close writers must additionally implement Output.
 	//
 	// For FsPathSink, this calls transport.OpenFileWriter() which:
 	//   - LocalTransport: opens local file
@@ -368,17 +348,13 @@ type FsPathSink struct {
 }
 
 // Caps returns filesystem sink capabilities.
-// Supports both overwrite and append, atomic writes (via temp+rename for >),
+// Supports streaming overwrite and append through the execution session,
 // but NOT concurrent-safe (OS doesn't guarantee linearizable appends).
 func (s FsPathSink) Caps() SinkCaps {
 	return SinkCaps{
-		Overwrite:      true,
-		Append:         true,
-		Read:           true,
-		Atomic:         true,
-		ConcurrentSafe: false,
-		Streaming:      true,
-		EarlyOpen:      true,
+		Write:  true,
+		Append: true,
+		Read:   true,
 	}
 }
 

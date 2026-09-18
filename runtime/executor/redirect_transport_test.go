@@ -76,11 +76,11 @@ func (d *captureSinkDecorator) IOCaps() decorator.IOCaps {
 	return decorator.IOCaps{Write: true, Append: true}
 }
 
-func (d *captureSinkDecorator) OpenRead(ctx decorator.ExecContext, opts ...decorator.IOOpts) (io.ReadCloser, error) {
+func (d *captureSinkDecorator) OpenRead(ctx decorator.ExecContext) (io.ReadCloser, error) {
 	return nil, nil
 }
 
-func (d *captureSinkDecorator) OpenWrite(ctx decorator.ExecContext, appendMode bool, opts ...decorator.IOOpts) (io.WriteCloser, error) {
+func (d *captureSinkDecorator) OpenWrite(ctx decorator.ExecContext, appendMode bool) (decorator.Output, error) {
 	testSinkStore.withRecord(d.id, func(record *sinkCaptureRecord) {
 		record.openCount++
 		record.sessionIDs = append(record.sessionIDs, ctx.Session.ID())
@@ -88,7 +88,7 @@ func (d *captureSinkDecorator) OpenWrite(ctx decorator.ExecContext, appendMode b
 			record.output.Reset()
 		}
 	})
-	return &captureSinkWriter{id: d.id}, nil
+	return decorator.StreamingOutput(&captureSinkWriter{id: d.id}), nil
 }
 
 func (d *captureSinkDecorator) WithParams(params map[string]any) decorator.IO {
@@ -139,9 +139,10 @@ func TestRedirectSinkUsesSourceTransportContext(t *testing.T) {
 				TransportID: "transport:A",
 				Args:        []planfmt.Arg{{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "echo routed"}}},
 			},
-			Target: planfmt.CommandNode{
-				Decorator: "@test.capture.sink",
-				Args:      []planfmt.Arg{{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: id}}},
+			Target: planfmt.EndpointSpec{
+				TransportID: "transport:A",
+				Decorator:   "@test.capture.sink",
+				Args:        []planfmt.Arg{{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: id}}},
 			},
 			Mode: planfmt.RedirectOverwrite,
 		},
@@ -187,7 +188,7 @@ func TestRedirectSinkInheritsWrapperTransportContext(t *testing.T) {
 						Decorator: "@shell",
 						Args:      []planfmt.Arg{{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "echo routed"}}},
 					},
-					Target: planfmt.CommandNode{
+					Target: planfmt.EndpointSpec{
 						Decorator: "@test.capture.sink",
 						Args:      []planfmt.Arg{{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: id}}},
 					},

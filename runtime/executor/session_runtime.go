@@ -120,6 +120,13 @@ func (r *sessionRuntime) createSession(transportID string) (decorator.Session, b
 
 	if normalizedTransportID(transport.Decorator) == "local" {
 		session, err := r.factory(transportID)
+		if err == nil {
+			for _, arg := range transport.Args {
+				if arg.Key == "cwd" && arg.Val.Kind == planfmt.ValueString {
+					session = session.WithWorkdir(arg.Val.Str)
+				}
+			}
+		}
 		return session, false, err
 	}
 

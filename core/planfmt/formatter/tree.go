@@ -40,6 +40,7 @@ func FormatTree(w io.Writer, plan *planfmt.Plan, useColor bool) {
 	}
 
 	renderStepList(w, plan.Steps, "", useColor)
+	formatOutputReview(w, plan)
 }
 
 func renderStepList(w io.Writer, steps []planfmt.Step, indent string, useColor bool) {
@@ -314,7 +315,7 @@ func renderRedirectNode(redirect *planfmt.RedirectNode, useColor bool) string {
 	if redirect.Mode == planfmt.RedirectAppend {
 		op = ">>"
 	}
-	return fmt.Sprintf("%s %s %s", renderExecutionNode(redirect.Source, useColor), op, renderCommandNode(&redirect.Target, useColor))
+	return fmt.Sprintf("%s %s %s", renderExecutionNode(redirect.Source, useColor), op, formatEndpoint(redirect.Target))
 }
 
 func renderLogicNode(logic *planfmt.LogicNode) string {

@@ -73,7 +73,11 @@ func parseAndPlanWithFixedSalt(t *testing.T, source, target string) (*planfmt.Pl
 func treeShape(node planfmt.ExecutionNode) string {
 	switch n := node.(type) {
 	case *planfmt.CommandNode:
-		return fmt.Sprintf("cmd(%s)", getCommandArg(n, "command"))
+		key := "command"
+		if n.Decorator == "@file" {
+			key = "path"
+		}
+		return fmt.Sprintf("cmd(%s)", getCommandArg(n, key))
 	case *planfmt.AndNode:
 		return fmt.Sprintf("and(%s,%s)", treeShape(n.Left), treeShape(n.Right))
 	case *planfmt.OrNode:
@@ -95,7 +99,7 @@ func treeShape(node planfmt.ExecutionNode) string {
 		if n.Mode == planfmt.RedirectAppend {
 			mode = ">>"
 		}
-		return fmt.Sprintf("redir(%s,%s,%s)", mode, treeShape(n.Source), treeShape(&n.Target))
+		return fmt.Sprintf("redir(%s,%s,%s)", mode, treeShape(n.Source), treeShape(n.Target.Command()))
 	default:
 		return fmt.Sprintf("unknown(%T)", node)
 	}
@@ -686,8 +690,8 @@ func TestParity_RedirectOperators(t *testing.T) {
 				t.Errorf("Expected source decorator @shell, got %q", sourceCmd.Decorator)
 			}
 
-			if redirectNode.Target.Decorator != "@shell" {
-				t.Errorf("Expected target decorator @shell, got %q", redirectNode.Target.Decorator)
+			if redirectNode.Target.Decorator != "@file" {
+				t.Errorf("Expected target decorator @file, got %q", redirectNode.Target.Decorator)
 			}
 		})
 	}

@@ -505,7 +505,7 @@ func (rd *Reader) readExecutionNode(r io.Reader, depth, maxDepth int) (Execution
 		}
 		return &RedirectNode{
 			Source: source,
-			Target: *target,
+			Target: EndpointSpec{Decorator: target.Decorator, TransportID: target.TransportID, Args: target.Args},
 			Mode:   RedirectMode(modeByte),
 		}, nil
 

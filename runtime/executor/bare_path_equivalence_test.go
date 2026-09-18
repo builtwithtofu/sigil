@@ -20,17 +20,15 @@ func TestBarePathEquivalence(t *testing.T) {
 		t.Parallel()
 
 		workdir := t.TempDir()
+		if err := os.Mkdir(filepath.Join(workdir, "io"), 0o700); err != nil {
+			t.Fatal(err)
+		}
 		session := decorator.NewLocalSession().WithWorkdir(workdir)
 		execCtx := decorator.ExecContext{Context: context.Background(), Session: session}
 
 		relPath := filepath.Join("io", "out.txt")
-		bareTarget := &planfmt.CommandNode{
-			Decorator: "@shell",
-			Args: []planfmt.Arg{{
-				Key: "command",
-				Val: planfmt.Value{Kind: planfmt.ValueString, Str: relPath},
-			}},
-		}
+		p, _ := planSinkScript(t, "echo output > "+relPath)
+		bareTarget := p.Steps[0].Tree.(*planfmt.RedirectNode).Target.Command()
 		explicitTarget := &planfmt.CommandNode{
 			Decorator: "@file",
 			Args: []planfmt.Arg{{
@@ -52,25 +50,25 @@ func TestBarePathEquivalence(t *testing.T) {
 			t.Fatalf("sink identity mismatch (-want +got):\n%s", diff)
 		}
 
-		bareWriter, err := bareIO.OpenWrite(execCtx, false)
+		bareWriter, err := bareIO.(decorator.Sink).OpenWrite(execCtx, false)
 		if err != nil {
 			t.Fatalf("open bare writer: %v", err)
 		}
 		if _, err := bareWriter.Write([]byte("bare\n")); err != nil {
 			t.Fatalf("write bare output: %v", err)
 		}
-		if err := bareWriter.Close(); err != nil {
+		if err := bareWriter.Finish(context.Background()); err != nil {
 			t.Fatalf("close bare writer: %v", err)
 		}
 
-		explicitWriter, err := explicitIO.OpenWrite(execCtx, false)
+		explicitWriter, err := explicitIO.(decorator.Sink).OpenWrite(execCtx, false)
 		if err != nil {
 			t.Fatalf("open explicit writer: %v", err)
 		}
 		if _, err := explicitWriter.Write([]byte("explicit\n")); err != nil {
 			t.Fatalf("write explicit output: %v", err)
 		}
-		if err := explicitWriter.Close(); err != nil {
+		if err := explicitWriter.Finish(context.Background()); err != nil {
 			t.Fatalf("close explicit writer: %v", err)
 		}
 
@@ -96,13 +94,8 @@ func TestBarePathEquivalence(t *testing.T) {
 			t.Fatalf("seed input file: %v", err)
 		}
 
-		bareTarget := &planfmt.CommandNode{
-			Decorator: "@shell",
-			Args: []planfmt.Arg{{
-				Key: "command",
-				Val: planfmt.Value{Kind: planfmt.ValueString, Str: relPath},
-			}},
-		}
+		p, _ := planSinkScript(t, "cat < "+relPath)
+		bareTarget := p.Steps[0].Tree.(*planfmt.RedirectNode).Target.Command()
 		explicitTarget := &planfmt.CommandNode{
 			Decorator: "@file",
 			Args: []planfmt.Arg{{
@@ -124,7 +117,7 @@ func TestBarePathEquivalence(t *testing.T) {
 			t.Fatalf("source identity mismatch (-want +got):\n%s", diff)
 		}
 
-		bareReader, err := bareIO.OpenRead(execCtx)
+		bareReader, err := bareIO.(decorator.Source).OpenRead(execCtx)
 		if err != nil {
 			t.Fatalf("open bare reader: %v", err)
 		}
@@ -136,7 +129,7 @@ func TestBarePathEquivalence(t *testing.T) {
 			t.Fatalf("close bare reader: %v", err)
 		}
 
-		explicitReader, err := explicitIO.OpenRead(execCtx)
+		explicitReader, err := explicitIO.(decorator.Source).OpenRead(execCtx)
 		if err != nil {
 			t.Fatalf("open explicit reader: %v", err)
 		}

@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -221,6 +222,17 @@ func (s *SSHTestServer) handleExec(channel ssh.Channel, req *ssh.Request, sessio
 	}
 
 	// Wire up I/O
+	stdin, pipeErr := cmd.StdinPipe()
+	if pipeErr != nil {
+		_ = channel.Close()
+		return
+	}
+	inputDone := make(chan struct{})
+	go func() {
+		defer close(inputDone)
+		defer stdin.Close()
+		_, _ = io.Copy(stdin, channel)
+	}()
 	cmd.Stdout = channel
 	cmd.Stderr = channel.Stderr()
 
@@ -241,6 +253,7 @@ func (s *SSHTestServer) handleExec(channel ssh.Channel, req *ssh.Request, sessio
 
 	// Close the channel to signal completion
 	_ = channel.Close()
+	<-inputDone
 }
 
 // Stop stops the SSH server and waits for all connections to close.

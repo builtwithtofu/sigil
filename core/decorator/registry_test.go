@@ -519,11 +519,11 @@ func (m *mockIODecorator) IOCaps() IOCaps {
 	return IOCaps{Read: true, Write: true, Append: true}
 }
 
-func (m *mockIODecorator) OpenRead(ctx ExecContext, opts ...IOOpts) (io.ReadCloser, error) {
+func (m *mockIODecorator) OpenRead(ctx ExecContext) (io.ReadCloser, error) {
 	return nil, nil // Stub
 }
 
-func (m *mockIODecorator) OpenWrite(ctx ExecContext, appendMode bool, opts ...IOOpts) (io.WriteCloser, error) {
+func (m *mockIODecorator) OpenWrite(ctx ExecContext, appendMode bool) (Output, error) {
 	return nil, nil // Stub
 }
 
@@ -547,11 +547,11 @@ func (m *mockExecIODecorator) IOCaps() IOCaps {
 	return IOCaps{Read: false, Write: true, Append: true}
 }
 
-func (m *mockExecIODecorator) OpenRead(ctx ExecContext, opts ...IOOpts) (io.ReadCloser, error) {
+func (m *mockExecIODecorator) OpenRead(ctx ExecContext) (io.ReadCloser, error) {
 	return nil, nil
 }
 
-func (m *mockExecIODecorator) OpenWrite(ctx ExecContext, appendMode bool, opts ...IOOpts) (io.WriteCloser, error) {
+func (m *mockExecIODecorator) OpenWrite(ctx ExecContext, appendMode bool) (Output, error) {
 	return nil, nil
 }
 
@@ -575,11 +575,11 @@ func (m *mockMultiRoleDecorator) IOCaps() IOCaps {
 	return IOCaps{Read: true, Write: true, Append: true}
 }
 
-func (m *mockMultiRoleDecorator) OpenRead(ctx ExecContext, opts ...IOOpts) (io.ReadCloser, error) {
+func (m *mockMultiRoleDecorator) OpenRead(ctx ExecContext) (io.ReadCloser, error) {
 	return nil, nil // Stub
 }
 
-func (m *mockMultiRoleDecorator) OpenWrite(ctx ExecContext, appendMode bool, opts ...IOOpts) (io.WriteCloser, error) {
+func (m *mockMultiRoleDecorator) OpenWrite(ctx ExecContext, appendMode bool) (Output, error) {
 	return nil, nil // Stub
 }
 

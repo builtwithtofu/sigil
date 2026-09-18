@@ -38,18 +38,18 @@ func (d *planRedirectErrorSink) IOCaps() decorator.IOCaps {
 	return decorator.IOCaps{Read: d.canRead, Write: d.canWrite, Append: d.canAppend}
 }
 
-func (d *planRedirectErrorSink) OpenRead(_ decorator.ExecContext, _ ...decorator.IOOpts) (io.ReadCloser, error) {
+func (d *planRedirectErrorSink) OpenRead(_ decorator.ExecContext) (io.ReadCloser, error) {
 	if d.openErr != nil {
 		return nil, d.openErr
 	}
 	return &planCloseControlledReader{reader: strings.NewReader("alpha\n"), closeErr: d.readClose}, nil
 }
 
-func (d *planRedirectErrorSink) OpenWrite(_ decorator.ExecContext, _ bool, _ ...decorator.IOOpts) (io.WriteCloser, error) {
+func (d *planRedirectErrorSink) OpenWrite(_ decorator.ExecContext, _ bool) (decorator.Output, error) {
 	if d.openErr != nil {
 		return nil, d.openErr
 	}
-	return &planCloseControlledWriter{closeErr: d.writeClose}, nil
+	return decorator.StreamingOutput(&planCloseControlledWriter{closeErr: d.writeClose}), nil
 }
 
 func (d *planRedirectErrorSink) WithParams(params map[string]any) decorator.IO {
@@ -133,7 +133,7 @@ func TestPlanRedirectValidateFailureReturnsStructuredSinkError(t *testing.T) {
 			{Key: "read", Val: planfmt.Value{Kind: planfmt.ValueBool, Bool: true}},
 		},
 		transportID:    "transport:validate",
-		expectedStderr: "Error: sink @test.plan.redirect.sink(validate) validate failed on transport transport:validate: does not support overwrite (>)",
+		expectedStderr: "sink @test.plan.redirect.sink(validate) validate failed on transport local: does not support overwrite (>)",
 	})
 }
 
@@ -150,7 +150,7 @@ func TestPlanRedirectOpenFailureReturnsStructuredSinkError(t *testing.T) {
 			{Key: "fail_open", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "open"}},
 		},
 		transportID:    "transport:open",
-		expectedStderr: "Error creating session: failed to create session for transport \"transport:open\": unknown transport \"transport:open\": transport not registered",
+		expectedStderr: "sink @test.plan.redirect.sink(open) open failed on transport local: open failed",
 	})
 }
 
@@ -167,7 +167,7 @@ func TestPlanRedirectInputCloseFailureReturnsStructuredSinkError(t *testing.T) {
 			{Key: "fail_close", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "read"}},
 		},
 		transportID:    "transport:input-close",
-		expectedStderr: "Error creating session: failed to create session for transport \"transport:input-close\": unknown transport \"transport:input-close\": transport not registered",
+		expectedStderr: "sink @test.plan.redirect.sink(input-close) close failed on transport local: read close failed",
 	})
 }
 
@@ -184,7 +184,7 @@ func TestPlanRedirectOutputCloseFailureReturnsStructuredSinkError(t *testing.T) 
 			{Key: "fail_close", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "write"}},
 		},
 		transportID:    "transport:output-close",
-		expectedStderr: "Error creating session: failed to create session for transport \"transport:output-close\": unknown transport \"transport:output-close\": transport not registered",
+		expectedStderr: "sink @test.plan.redirect.sink(output-close) finish failed on transport local: write close failed",
 	})
 }
 
@@ -204,10 +204,10 @@ func runPlanRedirectErrorCase(t *testing.T, tc planRedirectErrorCase) {
 		Tree: &planfmt.RedirectNode{
 			Source: &planfmt.CommandNode{
 				Decorator:   "@shell",
-				TransportID: tc.transportID,
+				TransportID: "local",
 				Args:        []planfmt.Arg{{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: tc.sourceCommand}}},
 			},
-			Target: planfmt.CommandNode{Decorator: "@test.plan.redirect.sink", Args: tc.sinkArgs},
+			Target: planfmt.EndpointSpec{Decorator: "@test.plan.redirect.sink", Args: tc.sinkArgs},
 			Mode:   tc.mode,
 		},
 	}}}

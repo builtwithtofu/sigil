@@ -26,7 +26,7 @@ type testSink struct {
 }
 
 func (s *testSink) Caps() sdk.SinkCaps {
-	return sdk.SinkCaps{Overwrite: true, Append: true, Read: true, Streaming: true, EarlyOpen: true}
+	return sdk.SinkCaps{Write: true, Append: true, Read: true}
 }
 
 func (s *testSink) OpenWrite(_ sdk.ExecutionContext, opts sdk.SinkOpts) (io.WriteCloser, error) {
@@ -237,7 +237,7 @@ func TestRedirectSinkCloseFailureReturnsFailure(t *testing.T) {
 	}
 	assertSinkErrorOutput(t, stderrBuf.String(), SinkError{
 		SinkID:      "test.sink (capture)",
-		Operation:   "close",
+		Operation:   "finish",
 		TransportID: "local",
 		Cause:       errors.New("close failed"),
 	})

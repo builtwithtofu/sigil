@@ -56,13 +56,19 @@ func (t *sessionTransport) Get(ctx context.Context, src string, dst io.Writer) e
 }
 
 func (t *sessionTransport) OpenFileWriter(ctx context.Context, path string, mode sdkexec.RedirectMode, perm fs.FileMode) (io.WriteCloser, error) {
-	return &sessionFileWriter{
-		session: t.session,
-		ctx:     ctx,
-		path:    path,
-		mode:    mode,
-		perm:    perm,
-	}, nil
+	writeMode := decorator.FileTruncate
+	switch mode {
+	case sdkexec.RedirectOverwrite:
+	case sdkexec.RedirectAppend:
+		writeMode = decorator.FileAppend
+	default:
+		return nil, errors.New("invalid file output mode")
+	}
+	output, err := decorator.OpenFileOutput(ctx, t.session, path, writeMode, perm)
+	if err != nil {
+		return nil, err
+	}
+	return decorator.CloseableOutput(ctx, output), nil
 }
 
 func (t *sessionTransport) OpenFileReader(ctx context.Context, path string) (io.ReadCloser, error) {
@@ -76,41 +82,4 @@ func (t *sessionTransport) OpenFileReader(ctx context.Context, path string) (io.
 
 func (t *sessionTransport) Close() error {
 	return nil
-}
-
-type sessionFileWriter struct {
-	session decorator.Session
-	ctx     context.Context
-	path    string
-	mode    sdkexec.RedirectMode
-	perm    fs.FileMode
-	buffer  bytes.Buffer
-	closed  bool
-}
-
-func (w *sessionFileWriter) Write(p []byte) (int, error) {
-	if w.closed {
-		return 0, errors.New("writer is closed")
-	}
-	return w.buffer.Write(p)
-}
-
-func (w *sessionFileWriter) Close() error {
-	if w.closed {
-		return nil
-	}
-	w.closed = true
-
-	data := append([]byte(nil), w.buffer.Bytes()...)
-	if w.mode == sdkexec.RedirectAppend {
-		existing, err := w.session.Get(w.ctx, w.path)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
-		if err == nil {
-			data = append(existing, data...)
-		}
-	}
-
-	return w.session.Put(w.ctx, data, w.path, w.perm)
 }

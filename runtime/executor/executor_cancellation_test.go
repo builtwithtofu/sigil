@@ -521,9 +521,9 @@ func planNodeFromSDKForCancellation(t *testing.T, node sdk.TreeNode) planfmt.Exe
 		}
 		return &planfmt.RedirectNode{
 			Source: planNodeFromSDKForCancellation(t, n.Source),
-			Target: planfmt.CommandNode{
-				Decorator: "@shell",
-				Args:      []planfmt.Arg{{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: sink.Path}}},
+			Target: planfmt.EndpointSpec{
+				Decorator: "@file",
+				Args:      []planfmt.Arg{{Key: "path", Val: planfmt.Value{Kind: planfmt.ValueString, Str: sink.Path}}},
 			},
 			Mode: planfmt.RedirectMode(n.Mode),
 		}
