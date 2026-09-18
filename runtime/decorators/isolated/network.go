@@ -73,6 +73,10 @@ func (s *networkLoopbackSession) Run(ctx context.Context, argv []string, opts de
 	return s.parent.Run(ctx, argv, opts)
 }
 
+func (s *networkLoopbackSession) OpenFileOutput(ctx context.Context, path string, mode decorator.FileWriteMode, perm fs.FileMode) (decorator.Output, error) {
+	return decorator.OpenFileOutput(ctx, s.parent, path, mode, perm)
+}
+
 func (s *networkLoopbackSession) Put(ctx context.Context, data []byte, path string, mode fs.FileMode) error {
 	return s.parent.Put(ctx, data, path, mode)
 }

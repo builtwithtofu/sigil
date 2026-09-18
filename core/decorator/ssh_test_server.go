@@ -230,7 +230,7 @@ func (s *SSHTestServer) handleExec(channel ssh.Channel, req *ssh.Request, sessio
 	inputDone := make(chan struct{})
 	go func() {
 		defer close(inputDone)
-		defer stdin.Close()
+		defer func() { _ = stdin.Close() }()
 		_, _ = io.Copy(stdin, channel)
 	}()
 	cmd.Stdout = channel

@@ -30,9 +30,11 @@ func (d *FileSinkDecorator) Descriptor() decorator.Descriptor {
 		Block(decorator.BlockForbidden).TransportScope(decorator.TransportScopeAny).
 		Roles(decorator.RoleEndpoint).Build()
 }
+
 func (d *FileSinkDecorator) IOCaps() decorator.IOCaps {
 	return decorator.IOCaps{Read: true, Write: true, Append: true}
 }
+
 func (d *FileSinkDecorator) config() (fileConfig, error) {
 	params := make(map[string]any, len(d.params))
 	for key, value := range d.params {
@@ -50,6 +52,7 @@ func (d *FileSinkDecorator) config() (fileConfig, error) {
 	}
 	return cfg, nil
 }
+
 func (d *FileSinkDecorator) OpenRead(ctx decorator.ExecContext) (io.ReadCloser, error) {
 	cfg, err := d.config()
 	if err != nil {
@@ -68,6 +71,7 @@ func (d *FileSinkDecorator) OpenRead(ctx decorator.ExecContext) (io.ReadCloser, 
 	}
 	return io.NopCloser(bytes.NewReader(data)), nil
 }
+
 func (d *FileSinkDecorator) OpenWrite(ctx decorator.ExecContext, appendMode bool) (decorator.Output, error) {
 	cfg, err := d.config()
 	if err != nil {
@@ -93,6 +97,7 @@ func (d *FileSinkDecorator) OpenWrite(ctx decorator.ExecContext, appendMode bool
 	}
 	return output, nil
 }
+
 func resolvePath(p string, session decorator.Session) string {
 	if session.Platform() == "windows" {
 		if filepath.IsAbs(p) {
@@ -105,9 +110,11 @@ func resolvePath(p string, session decorator.Session) string {
 	}
 	return path.Join(session.Cwd(), p)
 }
+
 func (d *FileSinkDecorator) WithParams(params map[string]any) decorator.IO {
 	return &FileSinkDecorator{params: params}
 }
+
 func init() {
 	if err := decorator.Register("file", &FileSinkDecorator{}); err != nil {
 		panic(err)

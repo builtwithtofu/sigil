@@ -106,6 +106,9 @@ type executor struct {
 func ExecutePlan(ctx context.Context, plan *planfmt.Plan, config Config, vlt DisplayIDResolver) (*ExecutionResult, error) {
 	invariant.NotNil(ctx, "ctx")
 	invariant.NotNil(plan, "plan")
+	if _, err := planfmt.ReviewOutputs(plan); err != nil {
+		return nil, fmt.Errorf("invalid plan outputs: %w", err)
+	}
 	ctx, stop := context.WithCancelCause(ctx)
 	defer stop(nil)
 

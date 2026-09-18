@@ -23,11 +23,13 @@ type outputScope struct {
 	directory string
 	retry     bool
 }
-type outputKey struct{ transport, directory, path string }
-type outputReview struct {
-	warnings   []string
-	transports map[string]Transport
-}
+type (
+	outputKey    struct{ transport, directory, path string }
+	outputReview struct {
+		warnings   []string
+		transports map[string]Transport
+	}
+)
 
 func (r *outputReview) inTransport(scope outputScope, id string) outputScope {
 	if scope.transport != id {
@@ -48,6 +50,7 @@ func (r *outputReview) steps(steps []Step, scope outputScope, parallel bool) (ma
 	}
 	return r.nodes(nodes, scope, parallel)
 }
+
 func (r *outputReview) nodes(nodes []ExecutionNode, scope outputScope, parallel bool) (map[outputKey]struct{}, error) {
 	outputs := map[outputKey]struct{}{}
 	for _, node := range nodes {
@@ -78,6 +81,7 @@ func (r *outputReview) nodes(nodes []ExecutionNode, scope outputScope, parallel 
 	}
 	return outputs, nil
 }
+
 func (r *outputReview) node(node ExecutionNode, scope outputScope) (map[outputKey]struct{}, error) {
 	switch n := node.(type) {
 	case *CommandNode:
@@ -141,6 +145,7 @@ func (r *outputReview) node(node ExecutionNode, scope outputScope) (map[outputKe
 		return map[outputKey]struct{}{}, nil
 	}
 }
+
 func outputStringArg(args []Arg, key string) string {
 	for _, arg := range args {
 		if arg.Key == key && arg.Val.Kind == ValueString {

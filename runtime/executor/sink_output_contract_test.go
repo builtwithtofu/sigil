@@ -32,9 +32,11 @@ type faultOutputSession struct {
 func (s *faultOutputSession) WithWorkdir(dir string) decorator.Session {
 	return &faultOutputSession{s.Session.WithWorkdir(dir), s.fault}
 }
+
 func (s *faultOutputSession) WithEnv(env map[string]string) decorator.Session {
 	return &faultOutputSession{s.Session.WithEnv(env), s.fault}
 }
+
 func (s *faultOutputSession) OpenFileOutput(ctx context.Context, path string, mode decorator.FileWriteMode, perm fs.FileMode) (decorator.Output, error) {
 	output, err := decorator.OpenFileOutput(ctx, s.Session, path, mode, perm)
 	if err != nil {
@@ -59,9 +61,11 @@ func (w *faultFileOutput) Write(p []byte) (int, error) {
 	}
 	return n, errors.Join(err, w.fault.writeErr)
 }
+
 func (w *faultFileOutput) Finish(ctx context.Context) error {
 	return errors.Join(w.Output.Finish(ctx), w.fault.finishErr)
 }
+
 func (w *faultFileOutput) Abort(ctx context.Context) error {
 	return errors.Join(w.Output.Abort(ctx), w.fault.abortErr)
 }

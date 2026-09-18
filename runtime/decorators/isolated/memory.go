@@ -77,6 +77,10 @@ func (s *memoryLockSession) Put(ctx context.Context, data []byte, path string, m
 	return s.parent.Put(ctx, data, path, mode)
 }
 
+func (s *memoryLockSession) OpenFileOutput(ctx context.Context, path string, mode decorator.FileWriteMode, perm fs.FileMode) (decorator.Output, error) {
+	return decorator.OpenFileOutput(ctx, s.parent, path, mode, perm)
+}
+
 func (s *memoryLockSession) Get(ctx context.Context, path string) ([]byte, error) {
 	return s.parent.Get(ctx, path)
 }

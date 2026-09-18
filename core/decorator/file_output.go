@@ -138,6 +138,7 @@ func (w *localFileOutput) Write(p []byte) (int, error) {
 	w.err = errors.Join(w.err, err)
 	return n, err
 }
+
 func (w *localFileOutput) Finish(ctx context.Context) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -151,6 +152,8 @@ func (w *localFileOutput) Finish(ctx context.Context) error {
 	}
 	w.stopCancel()
 	w.err = errors.Join(w.err, w.closeFile())
+	// This final check is the publication decision. Rename cannot be cancelled;
+	// cancellation racing after this decision cannot roll back a replacement.
 	if w.err == nil {
 		w.err = errors.Join(ctx.Err(), w.ctx.Err())
 	}

@@ -14,8 +14,10 @@ func TestOutputReviewNestedLocalWorkdirsWithoutTransportTable(t *testing.T) {
 						Args: []Arg{{Key: "path", Val: Value{Kind: ValueString, Str: "leaf"}}},
 						Block: []Step{{Tree: &RedirectNode{
 							Source: &CommandNode{Decorator: "@shell", TransportID: transport},
-							Target: EndpointSpec{Decorator: "@file", TransportID: transport,
-								Args: []Arg{{Key: "path", Val: Value{Kind: ValueString, Str: "out"}}}},
+							Target: EndpointSpec{
+								Decorator: "@file", TransportID: transport,
+								Args: []Arg{{Key: "path", Val: Value{Kind: ValueString, Str: "out"}}},
+							},
 						}}},
 					}}},
 				}}
