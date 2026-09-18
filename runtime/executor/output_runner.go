@@ -12,7 +12,8 @@ import (
 
 // runOutput owns the sink lifetime, even when producers ignore writer errors.
 func (e *executor) runOutput(execCtx sdk.ExecutionContext, identity, transport string,
-	open func(context.Context) (decorator.Output, error), run func(sdk.ExecutionContext, io.Writer) int) int {
+	open func(context.Context) (decorator.Output, error), run func(sdk.ExecutionContext, io.Writer) int,
+) int {
 	ctx, cancel := context.WithCancel(execCtx.Context())
 	defer cancel()
 	writer, err := open(ctx)

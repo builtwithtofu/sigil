@@ -15,9 +15,11 @@ import (
 func (s *SSHSession) OpenFileOutput(ctx context.Context, path string, mode FileWriteMode, perm fs.FileMode) (Output, error) {
 	return s.openFileOutput(ctx, "", path, mode, perm)
 }
+
 func (s *SSHSessionWithEnv) OpenFileOutput(ctx context.Context, path string, mode FileWriteMode, perm fs.FileMode) (Output, error) {
 	return s.base.openFileOutput(ctx, s.cwd, path, mode, perm)
 }
+
 func (s *SSHSession) openFileOutput(ctx context.Context, cwd, path string, mode FileWriteMode, perm fs.FileMode) (Output, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -90,6 +92,7 @@ func (w *sshFileOutput) Write(p []byte) (int, error) {
 	}
 	return w.stdin.Write(p)
 }
+
 func (w *sshFileOutput) Finish(ctx context.Context) error {
 	w.once.Do(func() {
 		stop := context.AfterFunc(ctx, func() { _ = w.session.Close() })

@@ -3,6 +3,7 @@ package executor
 import (
 	"errors"
 	"fmt"
+
 	"github.com/builtwithtofu/sigil/core/decorator"
 )
 

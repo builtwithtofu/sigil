@@ -130,6 +130,10 @@ func (s *isolatedSession) Run(ctx context.Context, argv []string, opts decorator
 	return s.parent.Run(ctx, argv, opts)
 }
 
+func (s *isolatedSession) OpenFileOutput(ctx context.Context, path string, mode decorator.FileWriteMode, perm fs.FileMode) (decorator.Output, error) {
+	return decorator.OpenFileOutput(ctx, s.parent, path, mode, perm)
+}
+
 func (s *isolatedSession) Put(ctx context.Context, data []byte, path string, mode fs.FileMode) error {
 	return s.parent.Put(ctx, data, path, mode)
 }

@@ -19,17 +19,17 @@ func formatEndpoint(endpoint planfmt.EndpointSpec) string {
 func formatOutputReview(w io.Writer, plan *planfmt.Plan) {
 	for _, transport := range plan.Transports {
 		call := &planfmt.CommandNode{Decorator: "@" + strings.TrimPrefix(transport.Decorator, "@"), Args: transport.Args}
-		fmt.Fprintf(w, "context %s: %s", transport.ID, formatCommandNode(call))
+		_, _ = fmt.Fprintf(w, "context %s: %s", transport.ID, formatCommandNode(call))
 		if transport.ParentID != "" {
-			fmt.Fprintf(w, " (parent=%s)", transport.ParentID)
+			_, _ = fmt.Fprintf(w, " (parent=%s)", transport.ParentID)
 		}
-		fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w)
 	}
 	warnings, err := planfmt.ReviewOutputs(plan)
 	for _, warning := range warnings {
-		fmt.Fprintln(w, "warning:", warning)
+		_, _ = fmt.Fprintln(w, "warning:", warning)
 	}
 	if err != nil {
-		fmt.Fprintln(w, "invalid outputs:", err)
+		_, _ = fmt.Fprintln(w, "invalid outputs:", err)
 	}
 }

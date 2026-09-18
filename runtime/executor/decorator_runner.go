@@ -251,35 +251,54 @@ func (e *executor) resolveDisplayIDs(params map[string]any, decoratorName, trans
 	resolved := make(map[string]any)
 
 	for key, val := range params {
-		strVal, ok := val.(string)
-		if !ok {
-			resolved[key] = val
-			continue
+		value, err := e.resolveArgumentValue(val, transportID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve %s.%s: %w", decoratorName, key, err)
 		}
-
-		matches := displayIDPattern.FindAllString(strVal, -1)
-		if len(matches) == 0 {
-			resolved[key] = val
-			continue
-		}
-
-		var result any = strVal
-		for _, displayID := range matches {
-			actualValue, err := e.vault.ResolveDisplayIDWithTransport(displayID, normalizedTransportID(transportID))
-			if err != nil {
-				return nil, fmt.Errorf("failed to resolve %s in %s.%s: %w", displayID, decoratorName, key, err)
-			}
-			if strVal == displayID {
-				result = actualValue
-				break
-			}
-			result = strings.ReplaceAll(result.(string), displayID, fmt.Sprint(actualValue))
-		}
-
-		resolved[key] = result
+		resolved[key] = value
 	}
 
 	return resolved, nil
+}
+
+func (e *executor) resolveArgumentValue(value any, transportID string) (any, error) {
+	switch value := value.(type) {
+	case string:
+		result := value
+		for _, id := range displayIDPattern.FindAllString(value, -1) {
+			actual, err := e.vault.ResolveDisplayIDWithTransport(id, normalizedTransportID(transportID))
+			if err != nil {
+				return nil, err
+			}
+			if value == id {
+				return actual, nil
+			}
+			result = strings.ReplaceAll(result, id, fmt.Sprint(actual))
+		}
+		return result, nil
+	case []any:
+		result := make([]any, len(value))
+		for i, item := range value {
+			resolved, err := e.resolveArgumentValue(item, transportID)
+			if err != nil {
+				return nil, err
+			}
+			result[i] = resolved
+		}
+		return result, nil
+	case map[string]any:
+		result := make(map[string]any, len(value))
+		for key, item := range value {
+			resolved, err := e.resolveArgumentValue(item, transportID)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = resolved
+		}
+		return result, nil
+	default:
+		return value, nil
+	}
 }
 
 // executeDecorator executes a decorator via the Exec interface.

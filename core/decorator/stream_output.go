@@ -26,6 +26,7 @@ func (s *streamOutput) Finish(context.Context) error {
 	s.once.Do(func() { s.err = s.writer.Close() })
 	return s.err
 }
+
 func (s *streamOutput) Abort(context.Context) error {
 	var err error
 	s.once.Do(func() { s.err = s.writer.Close(); err = s.err })
