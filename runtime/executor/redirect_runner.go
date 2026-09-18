@@ -1,10 +1,11 @@
 package executor
 
 import (
-	"fmt"
+	"context"
 	"io"
 	"sync"
 
+	"github.com/builtwithtofu/sigil/core/decorator"
 	"github.com/builtwithtofu/sigil/core/invariant"
 	"github.com/builtwithtofu/sigil/core/sdk"
 )
@@ -13,16 +14,23 @@ type sinkWriteErrorCapture struct {
 	writer io.Writer
 	mu     sync.Mutex
 	err    error
+	cancel context.CancelFunc
 }
 
 func (c *sinkWriteErrorCapture) Write(p []byte) (int, error) {
 	n, err := c.writer.Write(p)
+	if err == nil && n != len(p) {
+		err = io.ErrShortWrite
+	}
 	if err != nil {
 		c.mu.Lock()
 		if c.err == nil {
 			c.err = err
 		}
 		c.mu.Unlock()
+		if c.cancel != nil {
+			c.cancel()
+		}
 	}
 	return n, err
 }
@@ -51,24 +59,21 @@ func (e *executor) executeRedirect(execCtx sdk.ExecutionContext, redirect *sdk.R
 	if redirect.Mode == sdk.RedirectInput {
 		if err := sdk.ValidateSinkForRead(redirect.Sink); err != nil {
 			kind, id := redirect.Sink.Identity()
-			sinkErr := SinkError{SinkID: kind + " (" + id + ")", Operation: "validate", TransportID: transportID, Cause: err}
-			_, _ = fmt.Fprintf(e.getStderr(), "Error: %v\n", sinkErr)
+			e.reportSinkError(kind+" ("+id+")", "validate", transportID, err)
 			return 1
 		}
 
 		reader, err := redirect.Sink.OpenRead(redirectExecCtx, sdk.SinkOpts{Mode: redirect.Mode, Stream: stream})
 		if err != nil {
 			kind, id := redirect.Sink.Identity()
-			sinkErr := SinkError{SinkID: kind + " (" + id + ")", Operation: "open", TransportID: transportID, Cause: err}
-			_, _ = fmt.Fprintf(e.getStderr(), "Error: %v\n", sinkErr)
+			e.reportSinkError(kind+" ("+id+")", "open", transportID, err)
 			return 1
 		}
 
 		exitCode := e.executeTreeIO(redirectExecCtx, withRedirectedStderrSource(redirect.Source, stderrOnly), reader, nil)
 		if closeErr := reader.Close(); closeErr != nil {
 			kind, id := redirect.Sink.Identity()
-			sinkErr := SinkError{SinkID: kind + " (" + id + ")", Operation: "close", TransportID: transportID, Cause: closeErr}
-			_, _ = fmt.Fprintf(e.getStderr(), "Error: %v\n", sinkErr)
+			e.reportSinkError(kind+" ("+id+")", "close", transportID, closeErr)
 			return 1
 		}
 
@@ -77,40 +82,21 @@ func (e *executor) executeRedirect(execCtx sdk.ExecutionContext, redirect *sdk.R
 
 	if err := sdk.ValidateSinkForWrite(redirect.Sink, redirect.Mode); err != nil {
 		kind, id := redirect.Sink.Identity()
-		sinkErr := SinkError{SinkID: kind + " (" + id + ")", Operation: "validate", TransportID: transportID, Cause: err}
-		_, _ = fmt.Fprintf(e.getStderr(), "Error: %v\n", sinkErr)
+		e.reportSinkError(kind+" ("+id+")", "validate", transportID, err)
 		return 1
 	}
 
-	writer, err := redirect.Sink.OpenWrite(redirectExecCtx, sdk.SinkOpts{Mode: redirect.Mode, Stream: stream})
-	if err != nil {
-		kind, id := redirect.Sink.Identity()
-		sinkErr := SinkError{SinkID: kind + " (" + id + ")", Operation: "open", TransportID: transportID, Cause: err}
-		_, _ = fmt.Fprintf(e.getStderr(), "Error: %v\n", sinkErr)
-		return 1
-	}
-
-	writeCapture := &sinkWriteErrorCapture{writer: writer}
-	exitCode := e.executeTreeIO(redirectExecCtx, withRedirectedStderrSource(redirect.Source, stderrOnly), stdin, writeCapture)
-	if writeErr := writeCapture.Err(); writeErr != nil {
-		kind, id := redirect.Sink.Identity()
-		sinkErr := SinkError{SinkID: kind + " (" + id + ")", Operation: "write", TransportID: transportID, Cause: writeErr}
-		_, _ = fmt.Fprintf(e.getStderr(), "Error: %v\n", sinkErr)
-		if closeErr := writer.Close(); closeErr != nil {
-			kind, id := redirect.Sink.Identity()
-			sinkErr := SinkError{SinkID: kind + " (" + id + ")", Operation: "close", TransportID: transportID, Cause: closeErr}
-			_, _ = fmt.Fprintf(e.getStderr(), "Error: %v\n", sinkErr)
-		}
-		return 1
-	}
-	if closeErr := writer.Close(); closeErr != nil {
-		kind, id := redirect.Sink.Identity()
-		sinkErr := SinkError{SinkID: kind + " (" + id + ")", Operation: "close", TransportID: transportID, Cause: closeErr}
-		_, _ = fmt.Fprintf(e.getStderr(), "Error: %v\n", sinkErr)
-		return 1
-	}
-
-	return exitCode
+	kind, id := redirect.Sink.Identity()
+	return e.runOutput(redirectExecCtx, kind+" ("+id+")", transportID,
+		func(ctx context.Context) (decorator.Output, error) {
+			writer, err := redirect.Sink.OpenWrite(redirectExecCtx.WithContext(ctx), sdk.SinkOpts{Mode: redirect.Mode, Stream: stream})
+			if err != nil {
+				return nil, err
+			}
+			return decorator.StreamingOutput(writer), nil
+		}, func(ctx sdk.ExecutionContext, writer io.Writer) int {
+			return e.executeTreeIO(ctx, withRedirectedStderrSource(redirect.Source, stderrOnly), stdin, writer)
+		})
 }
 
 func redirectStderrEnabled(node sdk.TreeNode) bool {

@@ -263,13 +263,17 @@ func (e *executor) resolveDisplayIDs(params map[string]any, decoratorName, trans
 			continue
 		}
 
-		result := strVal
+		var result any = strVal
 		for _, displayID := range matches {
 			actualValue, err := e.vault.ResolveDisplayIDWithTransport(displayID, normalizedTransportID(transportID))
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve %s in %s.%s: %w", displayID, decoratorName, key, err)
 			}
-			result = strings.ReplaceAll(result, displayID, fmt.Sprint(actualValue))
+			if strVal == displayID {
+				result = actualValue
+				break
+			}
+			result = strings.ReplaceAll(result.(string), displayID, fmt.Sprint(actualValue))
 		}
 
 		resolved[key] = result

@@ -59,7 +59,7 @@ func TestPlanPipelinePreservesDataFlow(t *testing.T) {
 				planShellCommand("printf 'alpha\\nbeta\\n'"),
 				planShellCommand("awk 'END {print NR}'"),
 			}},
-			Target: *planShellCommand(outPath),
+			Target: fileEndpoint(outPath),
 			Mode:   planfmt.RedirectOverwrite,
 		},
 	}}}
@@ -129,7 +129,7 @@ func TestStderrCaptureWithFileSink(t *testing.T) {
 					Decorator: "@shell",
 					Args:      []planfmt.Arg{{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "echo out && echo err 1>&2"}}},
 				},
-				Target: planfmt.CommandNode{
+				Target: planfmt.EndpointSpec{
 					Decorator: "@file",
 					Args:      []planfmt.Arg{{Key: "path", Val: planfmt.Value{Kind: planfmt.ValueString, Str: outPath}}},
 				},
@@ -166,7 +166,7 @@ func TestStderrCaptureWithFileSink(t *testing.T) {
 						{Key: "stderr", Val: planfmt.Value{Kind: planfmt.ValueBool, Bool: true}},
 					},
 				},
-				Target: planfmt.CommandNode{
+				Target: planfmt.EndpointSpec{
 					Decorator: "@file",
 					Args:      []planfmt.Arg{{Key: "path", Val: planfmt.Value{Kind: planfmt.ValueString, Str: outPath}}},
 				},

@@ -480,15 +480,15 @@ func TestShellDecorator_NewArch_PipedStdinNoMatch(t *testing.T) {
 	}
 }
 
-// TestShellDecorator_NewArch_IOWrite tests @shell as file write I/O
-func TestShellDecorator_NewArch_IOWrite(t *testing.T) {
+// File endpoint I/O uses the execution session, not the shell decorator.
+func TestFileEndpointIOWrite(t *testing.T) {
 	// Create temp file path
 	tmpFile := t.TempDir() + "/test_output.txt"
 
 	// Create decorator instance with params
-	shell := &ShellDecorator{
+	shell := &FileSinkDecorator{
 		params: map[string]any{
-			"command": tmpFile,
+			"path": tmpFile,
 		},
 	}
 
@@ -506,7 +506,7 @@ func TestShellDecorator_NewArch_IOWrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error opening for write, got: %v", err)
 	}
-	defer writer.Close()
+	defer writer.Abort(context.Background())
 
 	// Write data
 	data := []byte("test data\n")
@@ -519,7 +519,7 @@ func TestShellDecorator_NewArch_IOWrite(t *testing.T) {
 	}
 
 	// Close to flush
-	if err := writer.Close(); err != nil {
+	if err := writer.Finish(context.Background()); err != nil {
 		t.Errorf("expected no error closing, got: %v", err)
 	}
 
@@ -533,8 +533,8 @@ func TestShellDecorator_NewArch_IOWrite(t *testing.T) {
 	}
 }
 
-// TestShellDecorator_NewArch_IORead tests @shell as file read I/O
-func TestShellDecorator_NewArch_IORead(t *testing.T) {
+// File endpoints also supply input redirection.
+func TestFileEndpointIORead(t *testing.T) {
 	// Create temp file with content
 	tmpFile := t.TempDir() + "/test_input.txt"
 	if err := os.WriteFile(tmpFile, []byte("input data\n"), 0o644); err != nil {
@@ -542,9 +542,9 @@ func TestShellDecorator_NewArch_IORead(t *testing.T) {
 	}
 
 	// Create decorator instance with params
-	shell := &ShellDecorator{
+	shell := &FileSinkDecorator{
 		params: map[string]any{
-			"command": tmpFile,
+			"path": tmpFile,
 		},
 	}
 
@@ -575,8 +575,8 @@ func TestShellDecorator_NewArch_IORead(t *testing.T) {
 	}
 }
 
-// TestShellDecorator_NewArch_MultiRole tests that @shell implements both Exec and IO
-func TestShellDecorator_NewArch_MultiRole(t *testing.T) {
+// Shell execution is not an endpoint; file I/O belongs to @file.
+func TestShellDecoratorIsNotAnEndpoint(t *testing.T) {
 	shell := &ShellDecorator{}
 
 	// Verify it implements Exec
@@ -585,13 +585,13 @@ func TestShellDecorator_NewArch_MultiRole(t *testing.T) {
 		t.Error("@shell should implement Exec interface")
 	}
 
-	// Verify it implements IO
+	// A shell decorator cannot bypass session-scoped file endpoints.
 	_, ok = interface{}(shell).(decorator.IO)
-	if !ok {
-		t.Error("@shell should implement IO interface")
+	if ok {
+		t.Error("@shell must not implement the endpoint interface")
 	}
 
-	// Verify descriptor shows both roles
+	// The descriptor must agree with the executable role.
 	desc := shell.Descriptor()
 	hasExec := false
 	hasEndpoint := false
@@ -606,8 +606,8 @@ func TestShellDecorator_NewArch_MultiRole(t *testing.T) {
 	if !hasExec {
 		t.Error("@shell descriptor should include RoleWrapper")
 	}
-	if !hasEndpoint {
-		t.Error("@shell descriptor should include RoleEndpoint")
+	if hasEndpoint {
+		t.Error("@shell descriptor must not include RoleEndpoint")
 	}
 }
 

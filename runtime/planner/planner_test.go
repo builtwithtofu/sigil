@@ -785,9 +785,9 @@ func TestRedirectOperators(t *testing.T) {
 				t.Errorf("Expected source decorator @shell, got %q", sourceCmd.Decorator)
 			}
 
-			// Target should be a CommandNode with @shell
-			if redirectNode.Target.Decorator != "@shell" {
-				t.Errorf("Expected target decorator @shell, got %q", redirectNode.Target.Decorator)
+			// Targets are explicit file endpoints.
+			if redirectNode.Target.Decorator != "@file" {
+				t.Errorf("Expected target decorator @file, got %q", redirectNode.Target.Decorator)
 			}
 		})
 	}
@@ -982,16 +982,8 @@ func TestRedirectDecoratorTarget(t *testing.T) {
 		t.Fatalf("redirect target decorator mismatch (-want +got):\n%s", diff)
 	}
 
-	if len(redirectNode.Target.Args) != 1 {
-		t.Fatalf("expected 1 redirect target arg, got %d", len(redirectNode.Target.Args))
-	}
-
-	if diff := cmp.Diff("path", redirectNode.Target.Args[0].Key); diff != "" {
-		t.Fatalf("redirect target arg key mismatch (-want +got):\n%s", diff)
-	}
-
-	if diff := cmp.Diff(planfmt.Value{Kind: planfmt.ValueString, Str: "sink-1"}, redirectNode.Target.Args[0].Val); diff != "" {
-		t.Fatalf("redirect target arg mismatch (-want +got):\n%s", diff)
+	if diff := cmp.Diff("sink-1", getCommandArg(redirectNode.Target.Command(), "path")); diff != "" {
+		t.Fatalf("redirect target path mismatch (-want +got):\n%s", diff)
 	}
 }
 

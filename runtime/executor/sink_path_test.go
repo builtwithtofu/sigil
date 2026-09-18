@@ -46,9 +46,9 @@ func TestFileSinkPathStyles(t *testing.T) {
 			},
 		},
 		{
-			name:      "bare shell path redirects through file sink",
-			decorator: "@shell",
-			argKey:    "command",
+			name:      "planned file endpoint",
+			decorator: "@file",
+			argKey:    "path",
 			path:      "io/bare.txt",
 			expectedStorePath: func(workdir string) string {
 				return filepath.Join(workdir, "io", "bare.txt")
@@ -62,6 +62,9 @@ func TestFileSinkPathStyles(t *testing.T) {
 			t.Parallel()
 
 			workdir := t.TempDir()
+			if err := os.Mkdir(filepath.Join(workdir, "io"), 0o700); err != nil {
+				t.Fatal(err)
+			}
 			session := decorator.NewLocalSession().WithWorkdir(workdir)
 			execCtx := decorator.ExecContext{Context: context.Background(), Session: session}
 
@@ -83,14 +86,14 @@ func TestFileSinkPathStyles(t *testing.T) {
 				t.Fatalf("sink identity mismatch (-want +got):\n%s", diff)
 			}
 
-			writer, err := ioDecorator.OpenWrite(execCtx, false)
+			writer, err := ioDecorator.(decorator.Sink).OpenWrite(execCtx, false)
 			if err != nil {
 				t.Fatalf("open sink writer: %v", err)
 			}
 			if _, err := writer.Write([]byte("payload\n")); err != nil {
 				t.Fatalf("write sink payload: %v", err)
 			}
-			if err := writer.Close(); err != nil {
+			if err := writer.Finish(context.Background()); err != nil {
 				t.Fatalf("close sink writer: %v", err)
 			}
 
@@ -103,7 +106,7 @@ func TestFileSinkPathStyles(t *testing.T) {
 				t.Fatalf("redirect sink content mismatch (-want +got):\n%s", diff)
 			}
 
-			reader, err := ioDecorator.OpenRead(execCtx)
+			reader, err := ioDecorator.(decorator.Source).OpenRead(execCtx)
 			if err != nil {
 				t.Fatalf("open sink reader: %v", err)
 			}

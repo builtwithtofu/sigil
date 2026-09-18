@@ -454,6 +454,34 @@ Operator semantics are runtime-contract semantics, not shell-dialect semantics.
 
 Future extensions may introduce shell-dialect-aware execution modes for specific transports, but this contract keeps operator ownership in Sigil.
 
+### 8.5 File endpoints and publication
+
+Redirects attach to commands: `a | b > result.txt` redirects `b`, not a new grouped pipeline operation. Bare paths lower to `@file` before plan display and hashing:
+
+```sigil
+printf report > "daily report.txt"
+printf report > @file("daily report.txt")
+printf entry >> events.log
+printf artifact > @file("artifact.txt", atomic=true, perm=384)
+```
+
+The first two declarations are equivalent, including literal backslashes in quoted paths. `perm` is the creation mode as an integer (`384` is octal `0600`); its default is `420` (`0644`). For variables, use `> "@var.destination"` or `> @file(@var.destination)`. Whole-value option references retain their types, such as `atomic=@var.publish` and `perm=@var.permissions`.
+
+- `>` opens and truncates before starting its producer; `>>` opens for streaming append. Neither buffers the entire output nor creates missing parent directories.
+- Default output streams immediately. Producer failure or cancellation can leave partial output. Existing streaming files retain their permissions; new files use the requested mode subject to the filesystem's creation mask.
+- Local POSIX FIFO output waits for a reader. Cancellation interrupts that wait and blocked FIFO writes. Non-pollable filesystem calls remain subject to operating-system blocking behavior.
+- Open failures prevent the owning producer from starting. Write, short-write, and completion failures fail the redirect even if the producer otherwise succeeds. When production and cleanup both fail, both outcomes are reported.
+- `atomic=true` requests replacement only after successful production, including empty output. Local POSIX regular files use private same-directory staging and rename. Failure or cancellation removes unpublished staging. Each retry attempt starts afresh.
+- Atomic replacement rejects append, symlink destinations, and non-regular existing destinations. It replaces inode metadata rather than preserving ownership, ACLs, or existing permissions. Requested permissions apply to the replacement. It does not promise crash durability or cleanup after process/machine death.
+- SSH output streams on the selected remote session, using its working directory. Atomic replacement, executable creation permission bits, and Windows SSH output are currently unsupported and fail before production. Unsupported backends never fall back to controller files or silently downgrade publication policy.
+- Publication without a confirmed acknowledgement is reported as **outcome unknown** and stops automatic retry. Reconcile the destination before replaying the operation.
+
+Plans show effective endpoint arguments and context identifiers, with the transport configuration and reviewed local working directory. Scope wrappers such as `@fs.workdir` remain part of that declaration. Planning does not open destinations. Changing the destination, scope, permissions, operator, or publication policy changes the contract; changing destination contents alone does not. These semantics require plan format version 2; regenerate older contracts.
+
+Plans warn that append inside `@exec.retry` can duplicate output. Identical known file destinations in independent `@exec.parallel` branches or pipeline commands are rejected. These are bounded checks on declarations, not filesystem alias detection, locking against external writers, deterministic interleaving, or exactly-once delivery. Distinct declared destinations remain usable.
+
+Sink payloads remain raw, including binary data and secrets. Terminal and plan output retain the CLI's secret-scrubbing boundary. No new sink providers, output grouping syntax, or numbered-descriptor redirection is implied by this contract.
+
 ## 9. Control Flow Semantics
 
 ## 9.1 `if`

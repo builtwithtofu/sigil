@@ -229,7 +229,7 @@ func TestFormatTree_WithRedirect(t *testing.T) {
 							{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "echo hello"}},
 						},
 					},
-					Target: planfmt.CommandNode{
+					Target: planfmt.EndpointSpec{
 						Decorator: "@shell",
 						Args: []planfmt.Arg{
 							{Key: "command", Val: planfmt.Value{Kind: planfmt.ValueString, Str: "output.txt"}},

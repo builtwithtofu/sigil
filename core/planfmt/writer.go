@@ -21,7 +21,7 @@ const (
 	// Version scheme: major.minor encoded as single uint16
 	// 0x0001 = version 1.0
 	// Breaking changes increment major, additions increment minor
-	Version uint16 = 0x0001
+	Version uint16 = 0x0002 // Explicit endpoints and streaming-by-default sink semantics.
 )
 
 // Flags is a bitmask for optional features
@@ -476,7 +476,7 @@ func (wr *Writer) writeExecutionNode(buf *bytes.Buffer, node ExecutionNode) erro
 		if err := wr.writeExecutionNode(buf, n.Source); err != nil {
 			return err
 		}
-		if err := wr.writeCommand(buf, &n.Target); err != nil {
+		if err := wr.writeCommand(buf, n.Target.Command()); err != nil {
 			return err
 		}
 		return buf.WriteByte(byte(n.Mode))

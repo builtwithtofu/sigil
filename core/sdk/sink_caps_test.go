@@ -39,7 +39,7 @@ func (m *mockSink) Identity() (kind, identifier string) {
 func TestValidateSinkForWrite_Overwrite_Success(t *testing.T) {
 	t.Parallel()
 	sink := &mockSink{
-		caps:     sdk.SinkCaps{Overwrite: true},
+		caps:     sdk.SinkCaps{Write: true},
 		kind:     "test.sink",
 		identity: "test-path",
 	}
@@ -54,7 +54,7 @@ func TestValidateSinkForWrite_Overwrite_Success(t *testing.T) {
 func TestValidateSinkForWrite_Overwrite_Failure(t *testing.T) {
 	t.Parallel()
 	sink := &mockSink{
-		caps:     sdk.SinkCaps{Overwrite: false},
+		caps:     sdk.SinkCaps{Write: false},
 		kind:     "test.sink",
 		identity: "test-path",
 	}
@@ -73,7 +73,7 @@ func TestValidateSinkForWrite_Overwrite_Failure(t *testing.T) {
 		SinkKind:    "test.sink",
 		SinkID:      "test-path",
 		RequestedOp: "overwrite (>)",
-		MissingCaps: []string{"Overwrite"},
+		MissingCaps: []string{"Write"},
 	}
 	if diff := cmp.Diff(expected, capsErr); diff != "" {
 		t.Errorf("error mismatch (-want +got):\n%s", diff)
@@ -217,45 +217,6 @@ func TestSinkCapabilityError_ErrorMessage(t *testing.T) {
 				t.Errorf("error message mismatch (-want +got):\n%s", diff)
 			}
 		})
-	}
-}
-
-// TestFsPathSink_Capabilities tests that FsPathSink reports correct capabilities
-func TestFsPathSink_Capabilities(t *testing.T) {
-	t.Parallel()
-	sink := sdk.FsPathSink{Path: "/tmp/test.txt"}
-
-	caps := sink.Caps()
-
-	// File sinks support all read/write modes
-	if !caps.Overwrite {
-		t.Error("FsPathSink should support Overwrite")
-	}
-	if !caps.Append {
-		t.Error("FsPathSink should support Append")
-	}
-	if !caps.Read {
-		t.Error("FsPathSink should support Read")
-	}
-
-	// File sinks support atomic writes via temp+rename
-	if !caps.Atomic {
-		t.Error("FsPathSink should support Atomic writes")
-	}
-
-	// File sinks can stream output
-	if !caps.Streaming {
-		t.Error("FsPathSink should support Streaming")
-	}
-
-	// File sinks can be opened early for validation
-	if !caps.EarlyOpen {
-		t.Error("FsPathSink should support EarlyOpen")
-	}
-
-	// File sinks are NOT concurrent-safe (OS doesn't guarantee linearizable appends)
-	if caps.ConcurrentSafe {
-		t.Error("FsPathSink should NOT be ConcurrentSafe")
 	}
 }
 

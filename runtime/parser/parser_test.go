@@ -112,7 +112,7 @@ func TestDecoratorSink(t *testing.T) {
 		},
 		{
 			name:        "accepts input redirect with decorator source",
-			input:       `cat < @shell("input.txt")`,
+			input:       `cat < @file("input.txt")`,
 			expectError: false,
 		},
 		{

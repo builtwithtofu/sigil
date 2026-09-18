@@ -59,3 +59,7 @@ func (s *transportScopedSession) Close() error {
 func (s *transportScopedSession) UnwrapSession() decorator.Session {
 	return s.session
 }
+
+func (s *transportScopedSession) OpenFileOutput(ctx context.Context, path string, mode decorator.FileWriteMode, perm fs.FileMode) (decorator.Output, error) {
+	return decorator.OpenFileOutput(ctx, s.session, path, mode, perm)
+}

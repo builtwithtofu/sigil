@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
@@ -90,6 +91,18 @@ func (e *Emitter) Emit() (*planfmt.Plan, error) {
 
 	// Add transport table
 	plan.Transports = e.collectTransports()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("resolve plan working directory: %w", err)
+	}
+	for i := range plan.Transports {
+		if plan.Transports[i].Decorator == "local" {
+			plan.Transports[i].Args = []planfmt.Arg{{Key: "cwd", Val: planfmt.Value{Kind: planfmt.ValueString, Str: cwd}}}
+		}
+	}
+	if _, err := planfmt.ReviewOutputs(plan); err != nil {
+		return nil, err
+	}
 
 	return plan, nil
 }
@@ -316,9 +329,18 @@ func (e *Emitter) buildRedirectNode(source planfmt.ExecutionNode, cmd *CommandSt
 		return source, nil
 	}
 
+	usesStart := len(e.secretUses)
 	target, err := e.buildRedirectTargetNode(cmd)
 	if err != nil {
 		return nil, err
+	}
+	if err := e.normalizeEndpoint(target, cmd.RedirectMode); err != nil {
+		return nil, err
+	}
+	// Usage sites follow the normalized declaration, independent of surface syntax.
+	e.secretUses = e.secretUses[:usesStart]
+	for _, arg := range target.Args {
+		e.recordEndpointUses(arg.Val, arg.Key)
 	}
 
 	mode := planfmt.RedirectOverwrite
@@ -331,7 +353,7 @@ func (e *Emitter) buildRedirectNode(source planfmt.ExecutionNode, cmd *CommandSt
 
 	return &planfmt.RedirectNode{
 		Source: source,
-		Target: *target,
+		Target: planfmt.EndpointSpec{Decorator: target.Decorator, TransportID: target.TransportID, Args: target.Args},
 		Mode:   mode,
 	}, nil
 }
@@ -349,16 +371,19 @@ func (e *Emitter) buildRedirectTargetNode(cmd *CommandStmtIR) (*planfmt.CommandN
 
 	displayIDs := make(map[string]string)
 	for _, part := range cmd.RedirectTarget.Parts {
-		e.collectDisplayID(part, displayIDs, "command")
+		e.collectDisplayID(part, displayIDs, "path")
 	}
 
-	commandStr := RenderCommand(cmd.RedirectTarget, displayIDs)
+	commandStr, err := endpointPath(RenderCommand(cmd.RedirectTarget, displayIDs))
+	if err != nil {
+		return nil, err
+	}
 	return &planfmt.CommandNode{
-		Decorator:   "@shell",
+		Decorator:   "@file",
 		TransportID: e.currentTransportID(),
 		Args: []planfmt.Arg{
 			{
-				Key: "command",
+				Key: "path",
 				Val: planfmt.Value{Kind: planfmt.ValueString, Str: commandStr},
 			},
 		},

@@ -23,6 +23,10 @@ func shellCmd(cmd string) *planfmt.CommandNode {
 	}
 }
 
+func fileEndpoint(path string) planfmt.EndpointSpec {
+	return planfmt.EndpointSpec{Decorator: "@file", Args: []planfmt.Arg{{Key: "path", Val: planfmt.Value{Kind: planfmt.ValueString, Str: path}}}}
+}
+
 // Helper to create a vault for testing
 func testVault() *vault.Vault {
 	planKey := make([]byte, 32)
@@ -288,7 +292,7 @@ func TestExecutorBashParity(t *testing.T) {
 			tree: &planfmt.AndNode{
 				Left: &planfmt.RedirectNode{
 					Source: shellCmd("echo 'a'"),
-					Target: *shellCmd("redirect_test_1.txt"),
+					Target: fileEndpoint("redirect_test_1.txt"),
 					Mode:   planfmt.RedirectOverwrite,
 				},
 				Right: shellCmd("echo 'b'"),
@@ -302,7 +306,7 @@ func TestExecutorBashParity(t *testing.T) {
 			tree: &planfmt.OrNode{
 				Left: &planfmt.RedirectNode{
 					Source: shellCmd("echo 'a'"),
-					Target: *shellCmd("redirect_test_2.txt"),
+					Target: fileEndpoint("redirect_test_2.txt"),
 					Mode:   planfmt.RedirectOverwrite,
 				},
 				Right: shellCmd("echo 'b'"),
@@ -317,7 +321,7 @@ func TestExecutorBashParity(t *testing.T) {
 				Commands: []planfmt.ExecutionNode{
 					&planfmt.RedirectNode{
 						Source: shellCmd("echo 'a'"),
-						Target: *shellCmd("redirect_test_3.txt"),
+						Target: fileEndpoint("redirect_test_3.txt"),
 						Mode:   planfmt.RedirectOverwrite,
 					},
 					shellCmd("cat"),
@@ -334,7 +338,7 @@ func TestExecutorBashParity(t *testing.T) {
 					shellCmd("echo 'a'"),
 					&planfmt.RedirectNode{
 						Source: shellCmd("cat"),
-						Target: *shellCmd("redirect_test_4.txt"),
+						Target: fileEndpoint("redirect_test_4.txt"),
 						Mode:   planfmt.RedirectOverwrite,
 					},
 				},
@@ -349,12 +353,12 @@ func TestExecutorBashParity(t *testing.T) {
 				Commands: []planfmt.ExecutionNode{
 					&planfmt.RedirectNode{
 						Source: shellCmd("echo 'a'"),
-						Target: *shellCmd("redirect_test_5a.txt"),
+						Target: fileEndpoint("redirect_test_5a.txt"),
 						Mode:   planfmt.RedirectOverwrite,
 					},
 					&planfmt.RedirectNode{
 						Source: shellCmd("echo 'b'"),
-						Target: *shellCmd("redirect_test_5b.txt"),
+						Target: fileEndpoint("redirect_test_5b.txt"),
 						Mode:   planfmt.RedirectOverwrite,
 					},
 				},
@@ -368,7 +372,7 @@ func TestExecutorBashParity(t *testing.T) {
 			tree: &planfmt.AndNode{
 				Left: &planfmt.RedirectNode{
 					Source: shellCmd("echo 'a'"),
-					Target: *shellCmd("redirect_test_6.txt"),
+					Target: fileEndpoint("redirect_test_6.txt"),
 					Mode:   planfmt.RedirectOverwrite,
 				},
 				Right: &planfmt.PipelineNode{
@@ -390,7 +394,7 @@ func TestExecutorBashParity(t *testing.T) {
 						shellCmd("echo 'a'"),
 						&planfmt.RedirectNode{
 							Source: shellCmd("cat"),
-							Target: *shellCmd("redirect_test_7.txt"),
+							Target: fileEndpoint("redirect_test_7.txt"),
 							Mode:   planfmt.RedirectOverwrite,
 						},
 					},
@@ -466,7 +470,7 @@ func TestExecuteRedirectAppend(t *testing.T) {
 				ID: 1,
 				Tree: &planfmt.RedirectNode{
 					Source: shellCmd("echo 'Line 2'"),
-					Target: *shellCmd(tmpFile),
+					Target: fileEndpoint(tmpFile),
 					Mode:   planfmt.RedirectAppend,
 				},
 			},
@@ -512,7 +516,7 @@ func TestExecuteRedirectWithPipeline(t *testing.T) {
 							},
 						},
 					},
-					Target: *shellCmd(tmpFile),
+					Target: fileEndpoint(tmpFile),
 					Mode:   planfmt.RedirectOverwrite,
 				},
 			},
@@ -545,7 +549,7 @@ func TestExecuteRedirectWithAndOperator(t *testing.T) {
 						Left:  shellCmd("echo 'first'"),
 						Right: shellCmd("echo 'second'"),
 					},
-					Target: *shellCmd(tmpFile),
+					Target: fileEndpoint(tmpFile),
 					Mode:   planfmt.RedirectOverwrite,
 				},
 			},
@@ -578,7 +582,7 @@ func TestExecuteRedirectWithOrOperator(t *testing.T) {
 						Left:  shellCmd("exit 1"),          // Fails
 						Right: shellCmd("echo 'fallback'"), // Runs
 					},
-					Target: *shellCmd(tmpFile),
+					Target: fileEndpoint(tmpFile),
 					Mode:   planfmt.RedirectOverwrite,
 				},
 			},
@@ -614,7 +618,7 @@ func TestExecuteRedirectWithSequence(t *testing.T) {
 							shellCmd("echo 'third'"),
 						},
 					},
-					Target: *shellCmd(tmpFile),
+					Target: fileEndpoint(tmpFile),
 					Mode:   planfmt.RedirectOverwrite,
 				},
 			},

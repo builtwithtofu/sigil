@@ -19,10 +19,8 @@ import (
 // - Body size: max 32 MB (enforced by reader)
 //
 // Version compatibility:
-// - Version field: uint16 encoded as major.minor (0x0001 = v1.0)
-// - Breaking changes increment major, additions increment minor
-// - Readers must reject versions with higher major number
-// - Readers should accept higher minor versions (forward compatible)
+// Readers require an exact uint16 version match. Version 2 binds explicit
+// endpoint policies and execution placement; version 1 contracts must be regenerated.
 
 // Plan is the in-memory representation of an execution plan.
 // This is the stable contract between planner, executor, and formatters.
@@ -281,7 +279,7 @@ func validateNode(node ExecutionNode, stepID uint64, seen map[uint64]bool) error
 		if err := validateNode(n.Source, stepID, seen); err != nil {
 			return err
 		}
-		if err := validateNode(&n.Target, stepID, seen); err != nil {
+		if err := validateNode(n.Target.Command(), stepID, seen); err != nil {
 			return err
 		}
 
@@ -355,7 +353,7 @@ func sortArgsInNode(node ExecutionNode) {
 
 	case *RedirectNode:
 		sortArgsInNode(n.Source)
-		sortArgsInNode(&n.Target)
+		sortArgsInNode(n.Target.Command())
 
 	case *LogicNode:
 		for i := range n.Block {

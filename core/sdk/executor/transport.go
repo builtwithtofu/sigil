@@ -37,9 +37,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
+	"github.com/builtwithtofu/sigil/core/decorator"
 	"github.com/builtwithtofu/sigil/core/invariant"
 )
 
@@ -388,42 +388,21 @@ func (t *LocalTransport) Get(ctx context.Context, src string, dst io.Writer) err
 	return nil
 }
 
-// OpenFileWriter opens a local file for writing (for output redirection).
-// Implements POSIX semantics with atomic writes:
-//   - RedirectOverwrite (>): atomic write via temp file + rename
-//   - RedirectAppend (>>): append to file (or create if doesn't exist)
+// OpenFileWriter shares session-owned streaming semantics with plan execution.
 func (t *LocalTransport) OpenFileWriter(ctx context.Context, path string, mode RedirectMode, perm fs.FileMode) (io.WriteCloser, error) {
-	invariant.NotNil(ctx, "context")
-	invariant.Precondition(path != "", "path cannot be empty")
-
-	// Create parent directories (same as Put method)
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
-	}
-
+	writeMode := decorator.FileTruncate
 	switch mode {
 	case RedirectOverwrite:
-		// Atomic write: write to temp file, rename on Close()
-		// This ensures readers never see partial writes
-		tmpPath := path + ".opal.tmp"
-		file, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
-		if err != nil {
-			return nil, err
-		}
-		return &atomicWriter{f: file, final: path, ctx: ctx}, nil
-
 	case RedirectAppend:
-		// Append mode: direct write (POSIX doesn't guarantee atomic append anyway)
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, perm)
-		if err != nil {
-			return nil, err
-		}
-		return file, nil
-
+		writeMode = decorator.FileAppend
 	default:
-		return nil, errors.New("invalid redirect mode")
+		return nil, errors.New("invalid file output mode")
 	}
+	output, err := decorator.OpenFileOutput(ctx, decorator.NewLocalSession(), path, writeMode, perm)
+	if err != nil {
+		return nil, err
+	}
+	return decorator.CloseableOutput(ctx, output), nil
 }
 
 // OpenFileReader opens a local file for reading (for input redirection).
@@ -432,56 +411,6 @@ func (t *LocalTransport) OpenFileReader(ctx context.Context, path string) (io.Re
 	invariant.Precondition(path != "", "path cannot be empty")
 
 	return os.Open(path)
-}
-
-// atomicWriter wraps a file and performs atomic rename on Close().
-// Used for RedirectOverwrite mode to ensure readers never see partial writes.
-type atomicWriter struct {
-	f      *os.File
-	final  string
-	ctx    context.Context
-	hadErr bool // Track if any write/close error occurred
-}
-
-func (w *atomicWriter) Write(b []byte) (int, error) {
-	// Check context cancellation
-	select {
-	case <-w.ctx.Done():
-		w.hadErr = true
-		return 0, w.ctx.Err()
-	default:
-	}
-
-	n, err := w.f.Write(b)
-	if err != nil {
-		w.hadErr = true
-	}
-	return n, err
-}
-
-func (w *atomicWriter) Close() error {
-	// Close the temp file first
-	closeErr := w.f.Close()
-	if closeErr != nil {
-		w.hadErr = true
-	}
-
-	// Only rename if no errors occurred during write/close
-	if w.hadErr {
-		// Clean up temp file on error
-		_ = os.Remove(w.f.Name()) // Best effort cleanup
-		return closeErr
-	}
-
-	// Atomically rename temp file to final destination
-	// On Windows, os.Rename fails if dest exists, so delete first
-	if runtime.GOOS == "windows" {
-		// Delete existing file (if any) then rename
-		// This isn't perfectly atomic on Windows, but close enough
-		_ = os.Remove(w.final) // Best effort - file may not exist
-	}
-
-	return os.Rename(w.f.Name(), w.final)
 }
 
 // Close is a no-op for LocalTransport (no resources to clean up).

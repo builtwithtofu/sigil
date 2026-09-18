@@ -3,8 +3,6 @@ package decorators
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
 	"regexp"
 
 	"github.com/builtwithtofu/sigil/core/decorator"
@@ -12,16 +10,13 @@ import (
 
 // ShellDecorator implements the @shell decorator using the new decorator architecture.
 // It executes shell commands via Session.Run() using explicit shell selection.
-// It also implements IO for file I/O operations (redirect sources and sinks).
-type ShellDecorator struct {
-	params map[string]any // Parameters for I/O mode
-}
+type ShellDecorator struct{}
 
 // Descriptor returns the decorator metadata.
 func (d *ShellDecorator) Descriptor() decorator.Descriptor {
 	return decorator.NewDescriptor("shell").
-		Summary("Execute shell commands or file I/O").
-		ParamString("command", "Shell command or file path").
+		Summary("Execute shell commands").
+		ParamString("command", "Shell command").
 		Required().
 		Examples("echo hello", "npm run build", "/path/to/file.txt").
 		Done().
@@ -29,9 +24,9 @@ func (d *ShellDecorator) Descriptor() decorator.Descriptor {
 		Values("bash", "pwsh", "cmd").
 		Examples("bash", "pwsh", "cmd").
 		Done().
-		Block(decorator.BlockForbidden).                      // Leaf decorator - no blocks
-		TransportScope(decorator.TransportScopeAny).          // Works in any session
-		Roles(decorator.RoleWrapper, decorator.RoleEndpoint). // Executes work AND provides I/O
+		Block(decorator.BlockForbidden).             // Leaf decorator - no blocks
+		TransportScope(decorator.TransportScopeAny). // Works in any session
+		Roles(decorator.RoleWrapper).
 		Build()
 }
 
@@ -134,64 +129,6 @@ func shellCommandArgs(shellName, command string) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("unsupported shell %q: expected one of bash, pwsh, cmd", shellName)
 	}
-}
-
-// IOCaps implements decorator.IO.
-// Returns the I/O capabilities for file operations.
-func (d *ShellDecorator) IOCaps() decorator.IOCaps {
-	return decorator.IOCaps{
-		Read:   true,  // < file.txt
-		Write:  true,  // > file.txt
-		Append: true,  // >> file.txt
-		Atomic: false, // TODO: Implement atomic writes via temp + rename (post-v1.0)
-	}
-}
-
-// OpenRead implements decorator.IO.
-// Opens a file for reading (< source).
-func (d *ShellDecorator) OpenRead(ctx decorator.ExecContext, opts ...decorator.IOOpts) (io.ReadCloser, error) {
-	filePath, ok := d.params["command"].(string)
-	if !ok || filePath == "" {
-		return nil, fmt.Errorf("@shell I/O requires command parameter (file path)")
-	}
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file for reading: %w", err)
-	}
-	return file, nil
-}
-
-// OpenWrite implements decorator.IO.
-// Opens a file for writing (> or >> sink).
-func (d *ShellDecorator) OpenWrite(ctx decorator.ExecContext, appendMode bool, opts ...decorator.IOOpts) (io.WriteCloser, error) {
-	filePath, ok := d.params["command"].(string)
-	if !ok || filePath == "" {
-		return nil, fmt.Errorf("@shell I/O requires command parameter (file path)")
-	}
-
-	if appendMode {
-		// >> append mode
-		file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open file for append: %w", err)
-		}
-		return file, nil
-	}
-
-	// > overwrite mode
-	file, err := os.Create(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file for writing: %w", err)
-	}
-	return file, nil
-}
-
-// WithParams implements decorator.IOFactory.
-// Creates a new ShellDecorator instance with the given parameters.
-// This is used for redirect targets where @shell("file.txt") needs params.
-func (d *ShellDecorator) WithParams(params map[string]any) decorator.IO {
-	return &ShellDecorator{params: params}
 }
 
 // Register @shell decorator

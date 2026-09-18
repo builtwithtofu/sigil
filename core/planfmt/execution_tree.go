@@ -71,28 +71,24 @@ const (
 	RedirectInput
 )
 
-// RedirectNode redirects stdout from Source to Target decorator.
-// Precedence: higher than &&, lower than |
-//
-// The target is ALWAYS a decorator that provides the sink:
-//   - Static paths: @shell("output.txt") - shell opens the file
-//   - Temp files: @file.temp() - decorator creates temp file
-//   - S3 objects: @aws.s3.object("key") - decorator provides S3 writer
-//   - HTTP: @http.post("url") - decorator provides HTTP writer
-//
-// Examples:
-//
-//	echo "hello" > output.txt
-//	  → @shell("echo \"hello\"") > @shell("output.txt")
-//
-//	build > @file.temp()
-//	  → @shell("build") > @file.temp()
-//
-//	logs >> @aws.s3.object("logs/app.log")
-//	  → @shell("logs") >> @aws.s3.object("logs/app.log")
+// EndpointSpec is a planned I/O destination, not an executable command.
+// Its arguments include effective defaults; TransportID identifies the owning scope.
+type EndpointSpec struct {
+	Decorator   string
+	TransportID string
+	Args        []Arg
+}
+
+// Command returns the common decorator-call representation used by the wire format
+// and renderers. Endpoint specifications cannot contain executable blocks.
+func (s EndpointSpec) Command() *CommandNode {
+	return &CommandNode{Decorator: s.Decorator, TransportID: s.TransportID, Args: s.Args}
+}
+
+// RedirectNode connects a producer to a declared endpoint.
 type RedirectNode struct {
 	Source ExecutionNode // Command/pipeline producing output
-	Target CommandNode   // Decorator providing the sink
+	Target EndpointSpec  // Declared endpoint in its execution scope
 	Mode   RedirectMode  // Overwrite or Append
 }
 
